@@ -23,7 +23,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang lld make curl
 
-      - name: Download OpenOrbis Toolchain
+      - name: Download Toolchain
         run: |
           curl -fL \
             https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
@@ -48,17 +48,33 @@ jobs:
 
           echo "Toolchain: $TOOLCHAIN"
 
-      - name: Download right repository
+      - name: Checkout right source
+        uses: actions/checkout@v4
+        with:
+          repository: OpenOrbis/right
+          path: right
+
+      - name: Build right.sprx
+        working-directory: right/OpenOrbis
         run: |
-          git clone --depth 1 https://github.com/OpenOrbis/right.git right
+          chmod +x build.bat || true
 
-          echo "Searching for right.sprx..."
+          echo "Right source files:"
+          ls -la ..
 
+          echo "Building right module..."
+
+          make -f Makefile || true
+
+          find .. -type f \( -name "*.sprx" -o -name "*.prx" \) -print
+
+      - name: Check right module
+        run: |
           RIGHT=$(find right -type f -name "right.sprx" | head -n 1)
 
           if [ -z "$RIGHT" ]; then
-            echo "ERROR: right.sprx was not found."
-            echo "Files in repository:"
+            echo "ERROR: right.sprx was not built."
+            echo "Available files:"
             find right -type f -print
             exit 1
           fi
@@ -70,15 +86,15 @@ jobs:
           cp "$RIGHT" \
             openorbis/samples/input/sce_sys/about/right.sprx
 
-      - name: Build OpenOrbis Input Sample
+      - name: Build Input Sample
         working-directory: openorbis/samples/input
         run: |
           make clean || true
           make
 
-      - name: Verify PKG
+      - name: Check PKG
         run: |
-          echo "Generated PKG files:"
+          echo "Generated packages:"
           find openorbis/samples/input -type f -name "*.pkg" -print
 
       - name: Upload PS4 PKG
