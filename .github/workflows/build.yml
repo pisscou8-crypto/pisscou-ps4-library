@@ -11,19 +11,12 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout OpenOrbis
-        uses: actions/checkout@v4
-        with:
-          repository: OpenOrbis/OpenOrbis-PS4-Toolchain
-          ref: v0.5.4
-          path: openorbis
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld make curl
 
-      - name: Download Toolchain
+      - name: Download OpenOrbis Release
         run: |
           curl -fL \
             https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
@@ -31,12 +24,12 @@ jobs:
 
           tar -xzf toolchain.tar.gz
 
-      - name: Locate Toolchain
+      - name: Find OpenOrbis Toolchain
         run: |
           TOOL=$(find "$GITHUB_WORKSPACE" -type f -name PkgTool.Core | head -n 1)
 
           if [ -z "$TOOL" ]; then
-            echo "PkgTool.Core not found"
+            echo "ERROR: PkgTool.Core not found"
             exit 1
           fi
 
@@ -46,59 +39,50 @@ jobs:
 
           chmod +x "$TOOLCHAIN"/bin/linux/* || true
 
-          echo "Toolchain: $TOOLCHAIN"
+          echo "Toolchain:"
+          echo "$TOOLCHAIN"
 
-      - name: Checkout right source
-        uses: actions/checkout@v4
-        with:
-          repository: OpenOrbis/right
-          path: right
-
-      - name: Build right.sprx
-        working-directory: right/OpenOrbis
+      - name: Find Input Sample
         run: |
-          chmod +x build.bat || true
+          INPUT=$(find "$OO_PS4_TOOLCHAIN" -type d -path "*/samples/input" | head -n 1)
 
-          echo "Right source files:"
-          ls -la ..
-
-          echo "Building right module..."
-
-          make -f Makefile || true
-
-          find .. -type f \( -name "*.sprx" -o -name "*.prx" \) -print
-
-      - name: Check right module
-        run: |
-          RIGHT=$(find right -type f -name "right.sprx" | head -n 1)
-
-          if [ -z "$RIGHT" ]; then
-            echo "ERROR: right.sprx was not built."
-            echo "Available files:"
-            find right -type f -print
+          if [ -z "$INPUT" ]; then
+            echo "ERROR: Input sample not found inside Release"
+            find "$OO_PS4_TOOLCHAIN/samples" -maxdepth 2 -type d
             exit 1
           fi
 
-          echo "Found: $RIGHT"
+          echo "INPUT=$INPUT" >> "$GITHUB_ENV"
 
-          mkdir -p openorbis/samples/input/sce_sys/about
+          echo "Input sample:"
+          echo "$INPUT"
 
-          cp "$RIGHT" \
-            openorbis/samples/input/sce_sys/about/right.sprx
+      - name: Check required files
+        run: |
+          echo "Checking sample files..."
+
+          find "$INPUT" -maxdepth 3 -type f | sort
+
+          if [ ! -f "$INPUT/sce_sys/about/right.sprx" ]; then
+            echo "ERROR: right.sprx is missing from the Release sample."
+            exit 1
+          fi
+
+          echo "right.sprx found."
 
       - name: Build Input Sample
-        working-directory: openorbis/samples/input
+        working-directory: ${{ env.INPUT }}
         run: |
           make clean || true
           make
 
       - name: Check PKG
         run: |
-          echo "Generated packages:"
-          find openorbis/samples/input -type f -name "*.pkg" -print
+          echo "PKG files:"
+          find "$INPUT" -type f -name "*.pkg" -print
 
       - name: Upload PS4 PKG
         uses: actions/upload-artifact@v4
         with:
           name: pisscou-ps4-input-test
-          path: openorbis/samples/input/*.pkg
+          path: ${{ env.INPUT }}/*.pkg
