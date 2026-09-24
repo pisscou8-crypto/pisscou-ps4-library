@@ -127,7 +127,6 @@ jobs:
           cat > "$GRAPHICS_SAMPLE/piglet/PigletApplication.cpp" <<'EOF'
           #include "PigletApplication.hpp"
 
-          #include <orbis/ScePad.h>
 
           #include <glm/vec3.hpp>
           #include <glm/vec2.hpp>
