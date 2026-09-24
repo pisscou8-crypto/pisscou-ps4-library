@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld make curl
+          sudo apt-get install -y clang lld make curl unzip
 
       - name: Download OpenOrbis Toolchain
         run: |
@@ -48,21 +48,17 @@ jobs:
 
           echo "Toolchain: $TOOLCHAIN"
 
-      - name: Find and copy right.sprx
+      - name: Prepare Input Sample
         run: |
-          RIGHT=$(find openorbis -type f -name "right.sprx" | head -n 1)
+          cd openorbis/samples/input
 
-          if [ -z "$RIGHT" ]; then
-            echo "right.sprx not found anywhere in OpenOrbis"
+          mkdir -p sce_sys/about
+
+          if [ ! -f sce_sys/about/right.sprx ]; then
+            echo "right.sprx is missing from the source checkout."
+            echo "The source repository does not contain the binary sample asset."
             exit 1
           fi
-
-          echo "Found: $RIGHT"
-
-          mkdir -p openorbis/samples/input/sce_sys/about
-
-          cp "$RIGHT" \
-             openorbis/samples/input/sce_sys/about/right.sprx
 
       - name: Build OpenOrbis Input Sample
         working-directory: openorbis/samples/input
