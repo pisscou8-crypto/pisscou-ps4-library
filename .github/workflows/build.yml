@@ -1,73 +1,31 @@
 name: Build PS4 PKG
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout OpenOrbis
-        uses: actions/checkout@v4
-        with:
-          repository: OpenOrbis/OpenOrbis-PS4-Toolchain
-          ref: v0.5.4
-          path: openorbis
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang lld make curl unzip
-
-      - name: Download OpenOrbis Toolchain
+      - name: Download OpenOrbis sample packages
         run: |
           curl -L \
-            https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
-            -o toolchain.tar.gz
+            https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/samples-pkg-llvm-18.zip \
+            -o samples.zip
 
-          tar -xzf toolchain.tar.gz
+          unzip -q samples.zip -d samples
 
-      - name: Locate Toolchain
+      - name: List sample packages
         run: |
-          TOOL=$(find "$GITHUB_WORKSPACE" -type f -name PkgTool.Core | head -n 1)
+          echo "Available PKG files:"
+          find samples -type f -name "*.pkg" -print
 
-          if [ -z "$TOOL" ]; then
-            echo "PkgTool.Core not found"
-            exit 1
-          fi
-
-          TOOLCHAIN=$(dirname "$(dirname "$(dirname "$TOOL")")")
-
-          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
-
-          chmod +x "$TOOLCHAIN"/bin/linux/* || true
-
-          echo "Toolchain: $TOOLCHAIN"
-
-      - name: Prepare Input Sample
-        run: |
-          cd openorbis/samples/input
-
-          mkdir -p sce_sys/about
-
-          if [ ! -f sce_sys/about/right.sprx ]; then
-            echo "right.sprx is missing from the source checkout."
-            echo "The source repository does not contain the binary sample asset."
-            exit 1
-          fi
-
-      - name: Build OpenOrbis Input Sample
-        working-directory: openorbis/samples/input
-        run: |
-          make clean || true
-          make
-
-      - name: Upload PS4 PKG
+      - name: Upload sample PKG
         uses: actions/upload-artifact@v4
         with:
-          name: pisscou-ps4-input-test
-          path: openorbis/samples/input/*.pkg
+          name: openorbis-sample-pkgs
+          path: samples/**/*.pkg
