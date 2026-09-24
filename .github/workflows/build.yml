@@ -1,0 +1,128 @@
+name: Build PISSCOU STORE
+
+on:
+workflow_dispatch:
+push:
+branches:
+- main
+
+jobs:
+build:
+runs-on: ubuntu-22.04
+
+steps:
+
+  - name: Install dependencies
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y clang lld make curl
+
+  - name: Download OpenOrbis v0.5.4
+    run: |
+      curl -fL \
+        https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
+        -o toolchain.tar.gz
+
+      tar -xzf toolchain.tar.gz
+
+  - name: Find OpenOrbis
+    run: |
+      TOOL=$(find "$GITHUB_WORKSPACE" \
+        -type f \
+        -name PkgTool.Core | head -n 1)
+
+      if [ -z "$TOOL" ]; then
+        echo "ERROR: OpenOrbis not found"
+        exit 1
+      fi
+
+      TOOLCHAIN=$(dirname "$(dirname "$(dirname "$TOOL")")")
+
+      echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
+
+      chmod +x "$TOOLCHAIN"/bin/linux/* || true
+
+      echo "OpenOrbis:"
+      echo "$TOOLCHAIN"
+
+  - name: Find Piglet
+    run: |
+      SAMPLE=""
+
+      for DIR in \
+        "$OO_PS4_TOOLCHAIN"/samples/* \
+        "$OO_PS4_TOOLCHAIN"/samples/*/*; do
+
+        if [ -f "$DIR/Makefile" ]; then
+
+          if grep -qiE \
+            "piglet|opengl|egl|gles" \
+            "$DIR/Makefile"; then
+
+            SAMPLE="$DIR"
+            break
+
+          fi
+        fi
+      done
+
+      if [ -z "$SAMPLE" ]; then
+        echo "ERROR: Piglet sample not found"
+        exit 1
+      fi
+
+      echo "GRAPHICS_SAMPLE=$SAMPLE" >> "$GITHUB_ENV"
+
+      echo "Piglet:"
+      echo "$SAMPLE"
+
+  - name: Create PISSCOU STORE information
+    run: |
+      mkdir -p "$GRAPHICS_SAMPLE/assets"
+
+      cat > "$GRAPHICS_SAMPLE/assets/games.json" <<'EOF'
+      {
+        "store": "PISSCOU STORE",
+        "games": [
+          {
+            "name": "Sonic 1 SMS Remake",
+            "version": "1.9.2",
+            "type": "Homebrew",
+            "title_id": "SMSR00001",
+            "description": "Sonic 1 SMS Remake for PlayStation 4",
+            "download": ""
+          }
+        ]
+      }
+      EOF
+
+      echo "Game entry created:"
+      cat "$GRAPHICS_SAMPLE/assets/games.json"
+
+  - name: Build PISSCOU STORE
+    working-directory: ${{ env.GRAPHICS_SAMPLE }}
+    run: |
+      make clean || true
+      make
+
+  - name: Find generated PKG
+    run: |
+      PKG=$(find "$GRAPHICS_SAMPLE" \
+        -type f \
+        -name "*.pkg" | head -n 1)
+
+      if [ -z "$PKG" ]; then
+        echo "ERROR: No PKG generated"
+        exit 1
+      fi
+
+      echo "PKG=$PKG" >> "$GITHUB_ENV"
+
+      echo "Generated:"
+      ls -lh "$PKG"
+
+  - name: Upload PISSCOU STORE
+    uses: actions/upload-artifact@v4
+    with:
+      name: PISSCOU-STORE
+      path: ${{ env.PKG }}
