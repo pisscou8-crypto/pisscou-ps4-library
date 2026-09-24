@@ -1,4 +1,4 @@
-name: Build PS4 PKG
+name: Build PS4 Graphics PKG
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang lld make curl
 
-      - name: Download OpenOrbis Release
+      - name: Download OpenOrbis v0.5.4
         run: |
           curl -fL \
             https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
@@ -39,50 +39,74 @@ jobs:
 
           chmod +x "$TOOLCHAIN"/bin/linux/* || true
 
-          echo "Toolchain:"
+          echo "OpenOrbis:"
           echo "$TOOLCHAIN"
 
-      - name: Find Input Sample
+      - name: Find Graphics Sample
         run: |
-          INPUT=$(find "$OO_PS4_TOOLCHAIN" -type d -path "*/samples/input" | head -n 1)
+          echo "Searching for Piglet/OpenGL samples..."
 
-          if [ -z "$INPUT" ]; then
-            echo "ERROR: Input sample not found inside Release"
-            find "$OO_PS4_TOOLCHAIN/samples" -maxdepth 2 -type d
+          SAMPLE=""
+
+          for DIR in \
+            "$OO_PS4_TOOLCHAIN"/samples/* \
+            "$OO_PS4_TOOLCHAIN"/samples/*/*; do
+
+            if [ -f "$DIR/Makefile" ]; then
+              if grep -qiE "piglet|opengl|egl|gles" "$DIR/Makefile"; then
+                SAMPLE="$DIR"
+                break
+              fi
+            fi
+          done
+
+          if [ -z "$SAMPLE" ]; then
+            echo "ERROR: Graphics sample not found."
+            echo "Available samples:"
+            find "$OO_PS4_TOOLCHAIN/samples" -maxdepth 3 -type f -name Makefile -print
             exit 1
           fi
 
-          echo "INPUT=$INPUT" >> "$GITHUB_ENV"
+          echo "GRAPHICS_SAMPLE=$SAMPLE" >> "$GITHUB_ENV"
 
-          echo "Input sample:"
-          echo "$INPUT"
+          echo "Graphics sample:"
+          echo "$SAMPLE"
 
-      - name: Check required files
+      - name: Show Graphics Sample
         run: |
-          echo "Checking sample files..."
+          echo "===== GRAPHICS SAMPLE FILES ====="
+          find "$GRAPHICS_SAMPLE" -maxdepth 3 -type f | sort
 
-          find "$INPUT" -maxdepth 3 -type f | sort
-
-          if [ ! -f "$INPUT/sce_sys/about/right.sprx" ]; then
-            echo "ERROR: right.sprx is missing from the Release sample."
-            exit 1
+      - name: Check package files
+        run: |
+          if [ ! -f "$GRAPHICS_SAMPLE/sce_sys/about/right.sprx" ]; then
+            echo "WARNING: right.sprx not found directly in sample."
+          else
+            echo "right.sprx found."
           fi
 
-          echo "right.sprx found."
-
-      - name: Build Input Sample
-        working-directory: ${{ env.INPUT }}
+      - name: Build Graphics Sample
+        working-directory: ${{ env.GRAPHICS_SAMPLE }}
         run: |
           make clean || true
           make
 
-      - name: Check PKG
+      - name: Find PKG
         run: |
-          echo "PKG files:"
-          find "$INPUT" -type f -name "*.pkg" -print
+          echo "===== PKG FILES ====="
+          find "$GRAPHICS_SAMPLE" -type f -name "*.pkg" -print
 
-      - name: Upload PS4 PKG
+          PKG=$(find "$GRAPHICS_SAMPLE" -type f -name "*.pkg" | head -n 1)
+
+          if [ -z "$PKG" ]; then
+            echo "ERROR: No PKG was produced."
+            exit 1
+          fi
+
+          echo "PKG=$PKG" >> "$GITHUB_ENV"
+
+      - name: Upload Graphics PKG
         uses: actions/upload-artifact@v4
         with:
-          name: pisscou-ps4-input-test
-          path: ${{ env.INPUT }}/*.pkg
+          name: pisscou-graphics-test
+          path: ${{ env.PKG }}
