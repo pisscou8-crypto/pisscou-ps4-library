@@ -1,0 +1,58 @@
+name: Build PS4 PKG
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout OpenOrbis
+        uses: actions/checkout@v4
+        with:
+          repository: OpenOrbis/OpenOrbis-PS4-Toolchain
+          ref: v0.5.4
+          path: openorbis
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld make
+
+      - name: Download OpenOrbis Toolchain
+        run: |
+          curl -L \
+            https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
+            -o toolchain.tar.gz
+          tar -xzf toolchain.tar.gz
+
+      - name: Locate Toolchain
+        run: |
+          TOOL=$(find "$GITHUB_WORKSPACE" -type f -name PkgTool.Core | head -n 1)
+
+          if [ -z "$TOOL" ]; then
+            echo "PkgTool.Core not found"
+            exit 1
+          fi
+
+          TOOLCHAIN=$(dirname "$(dirname "$(dirname "$TOOL")")")
+
+          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
+          chmod +x "$TOOLCHAIN"/bin/linux/* || true
+
+          echo "Using toolchain:"
+          echo "$TOOLCHAIN"
+
+      - name: Build OpenOrbis Hello World
+        working-directory: openorbis/samples/hello_world
+        run: make
+
+      - name: Upload PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: pisscou-ps4-test
+          path: openorbis/samples/hello_world/*.pkg
