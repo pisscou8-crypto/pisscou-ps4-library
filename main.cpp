@@ -4,18 +4,51 @@
 
 #include <orbis/libkernel.h>
 #include <orbis/ScePad.h>
-#include <orbis/SceVideoOut.h>
+
+static const char* games[] =
+{
+    "My Game 1",
+    "My Game 2",
+    "My Game 3",
+    "My Game 4"
+};
+
+static const int GAME_COUNT = 4;
 
 int main()
 {
     scePadInit();
 
-    int handle = scePadOpen(0, SCE_PAD_PORT_TYPE_LOCAL, 0, NULL);
+    int handle = scePadOpen(
+        0,
+        SCE_PAD_PORT_TYPE_LOCAL,
+        0,
+        NULL
+    );
 
-    printf("Pisscou PS4 Library\n");
-    printf("D-Pad: Navigate\n");
-    printf("X: Select\n");
-    printf("O: Back\n");
+    int selected = 0;
+
+    printf("\n");
+    printf("=================================\n");
+    printf("       PISSCOU GAME STORE\n");
+    printf("=================================\n");
+    printf("\n");
+
+    printf("Games:\n\n");
+
+    for (int i = 0; i < GAME_COUNT; i++)
+    {
+        if (i == selected)
+            printf(" > %s\n", games[i]);
+        else
+            printf("   %s\n", games[i]);
+    }
+
+    printf("\n");
+    printf("D-Pad : Navigate\n");
+    printf("X     : Download\n");
+    printf("O     : Back\n");
+    printf("\n");
 
     while (1)
     {
@@ -27,17 +60,32 @@ int main()
 
             if (ret > 0)
             {
-                if (data.buttons & SCE_PAD_BUTTON_CROSS)
-                    printf("SELECT\n");
-
-                if (data.buttons & SCE_PAD_BUTTON_CIRCLE)
-                    printf("BACK\n");
-
                 if (data.buttons & SCE_PAD_BUTTON_UP)
-                    printf("UP\n");
+                {
+                    if (selected > 0)
+                        selected--;
+
+                    printf("Selected: %s\n", games[selected]);
+                }
 
                 if (data.buttons & SCE_PAD_BUTTON_DOWN)
-                    printf("DOWN\n");
+                {
+                    if (selected < GAME_COUNT - 1)
+                        selected++;
+
+                    printf("Selected: %s\n", games[selected]);
+                }
+
+                if (data.buttons & SCE_PAD_BUTTON_CROSS)
+                {
+                    printf("DOWNLOAD: %s\n", games[selected]);
+                    printf("Download system will be added next.\n");
+                }
+
+                if (data.buttons & SCE_PAD_BUTTON_CIRCLE)
+                {
+                    printf("BACK\n");
+                }
             }
         }
 
