@@ -48,28 +48,46 @@ jobs:
 
           echo "Toolchain: $TOOLCHAIN"
 
-      - name: Prepare Hello World files
+      - name: Prepare PS4 package files
         run: |
-          mkdir -p openorbis/samples/hello_world/sce_sys/about
+          APP="$GITHUB_WORKSPACE/openorbis/samples/hello_world"
+
+          mkdir -p "$APP/sce_sys/about"
+          mkdir -p "$APP/sce_module"
 
           RIGHT=$(find "$GITHUB_WORKSPACE" -type f -name "right.sprx" | head -n 1)
+          LIBC=$(find "$GITHUB_WORKSPACE" -type f -name "libc.prx" | head -n 1)
+          FIOS=$(find "$GITHUB_WORKSPACE" -type f -name "libSceFios2.prx" | head -n 1)
 
           if [ -z "$RIGHT" ]; then
             echo "right.sprx not found"
             exit 1
           fi
 
-          cp "$RIGHT" openorbis/samples/hello_world/sce_sys/about/right.sprx
+          if [ -z "$LIBC" ]; then
+            echo "libc.prx not found"
+            exit 1
+          fi
 
-          echo "Copied right.sprx from:"
-          echo "$RIGHT"
+          if [ -z "$FIOS" ]; then
+            echo "libSceFios2.prx not found"
+            exit 1
+          fi
+
+          cp "$RIGHT" "$APP/sce_sys/about/right.sprx"
+          cp "$LIBC" "$APP/sce_module/libc.prx"
+          cp "$FIOS" "$APP/sce_module/libSceFios2.prx"
+
+          echo "Package files prepared."
 
       - name: Build Hello World
         working-directory: openorbis/samples/hello_world
-        run: make
+        run: |
+          make clean || true
+          make
 
       - name: Upload PS4 PKG
         uses: actions/upload-artifact@v4
         with:
-          name: pisscou-ps4-test
+          name: pisscou-ps4-test-v2
           path: openorbis/samples/hello_world/*.pkg
