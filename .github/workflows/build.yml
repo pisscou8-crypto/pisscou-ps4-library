@@ -21,13 +21,14 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld make
+          sudo apt-get install -y clang lld make curl
 
       - name: Download OpenOrbis Toolchain
         run: |
           curl -L \
             https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
             -o toolchain.tar.gz
+
           tar -xzf toolchain.tar.gz
 
       - name: Locate Toolchain
@@ -42,16 +43,32 @@ jobs:
           TOOLCHAIN=$(dirname "$(dirname "$(dirname "$TOOL")")")
 
           echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
+
           chmod +x "$TOOLCHAIN"/bin/linux/* || true
 
-          echo "Using toolchain:"
-          echo "$TOOLCHAIN"
+          echo "Toolchain: $TOOLCHAIN"
 
-      - name: Build OpenOrbis Hello World
+      - name: Prepare Hello World files
+        run: |
+          mkdir -p openorbis/samples/hello_world/sce_sys/about
+
+          RIGHT=$(find "$GITHUB_WORKSPACE" -type f -name "right.sprx" | head -n 1)
+
+          if [ -z "$RIGHT" ]; then
+            echo "right.sprx not found"
+            exit 1
+          fi
+
+          cp "$RIGHT" openorbis/samples/hello_world/sce_sys/about/right.sprx
+
+          echo "Copied right.sprx from:"
+          echo "$RIGHT"
+
+      - name: Build Hello World
         working-directory: openorbis/samples/hello_world
         run: make
 
-      - name: Upload PKG
+      - name: Upload PS4 PKG
         uses: actions/upload-artifact@v4
         with:
           name: pisscou-ps4-test
