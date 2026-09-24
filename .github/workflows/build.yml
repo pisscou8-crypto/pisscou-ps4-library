@@ -48,11 +48,20 @@ jobs:
 
           echo "Toolchain: $TOOLCHAIN"
 
-      - name: Copy required PS4 package file
+      - name: Find and copy right.sprx
         run: |
+          RIGHT=$(find openorbis -type f -name "right.sprx" | head -n 1)
+
+          if [ -z "$RIGHT" ]; then
+            echo "right.sprx not found anywhere in OpenOrbis"
+            exit 1
+          fi
+
+          echo "Found: $RIGHT"
+
           mkdir -p openorbis/samples/input/sce_sys/about
 
-          cp openorbis/samples/hello_world/sce_sys/about/right.sprx \
+          cp "$RIGHT" \
              openorbis/samples/input/sce_sys/about/right.sprx
 
       - name: Build OpenOrbis Input Sample
