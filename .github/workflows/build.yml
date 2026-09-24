@@ -48,6 +48,13 @@ jobs:
 
           echo "Toolchain: $TOOLCHAIN"
 
+      - name: Copy required PS4 package file
+        run: |
+          mkdir -p openorbis/samples/input/sce_sys/about
+
+          cp openorbis/samples/hello_world/sce_sys/about/right.sprx \
+             openorbis/samples/input/sce_sys/about/right.sprx
+
       - name: Build OpenOrbis Input Sample
         working-directory: openorbis/samples/input
         run: |
