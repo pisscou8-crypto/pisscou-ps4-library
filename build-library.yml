@@ -1,0 +1,78 @@
+name: Build PISSCOU Library
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "samples/library/**"
+      - ".github/workflows/build-library.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld make curl
+
+      - name: Download OpenOrbis v0.5.4
+        run: |
+          curl -fL \
+            https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
+            -o toolchain.tar.gz
+
+          tar -xzf toolchain.tar.gz
+
+      - name: Find OpenOrbis Toolchain
+        run: |
+          TOOL=$(find "$GITHUB_WORKSPACE" -type f -name PkgTool.Core | head -n 1)
+
+          if [ -z "$TOOL" ]; then
+            echo "ERROR: PkgTool.Core not found"
+            exit 1
+          fi
+
+          TOOLCHAIN=$(dirname "$(dirname "$(dirname "$TOOL")")")
+
+          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
+
+          chmod +x "$TOOLCHAIN"/bin/linux/* || true
+
+          echo "OpenOrbis:"
+          echo "$TOOLCHAIN"
+
+      - name: Check Library Files
+        run: |
+          echo "===== LIBRARY FILES ====="
+          find samples/library -maxdepth 3 -type f | sort
+
+      - name: Build PISSCOU Library
+        working-directory: samples/library
+        run: |
+          make clean || true
+          make
+
+      - name: Find PKG
+        run: |
+          echo "===== PKG FILES ====="
+          find samples/library -type f -name "*.pkg" -print
+
+          PKG=$(find samples/library -type f -name "*.pkg" | head -n 1)
+
+          if [ -z "$PKG" ]; then
+            echo "ERROR: No PKG was produced."
+            exit 1
+          fi
+
+          echo "PKG=$PKG" >> "$GITHUB_ENV"
+
+      - name: Upload PISSCOU Library PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: pisscou-app-library
+          path: ${{ env.PKG }}
