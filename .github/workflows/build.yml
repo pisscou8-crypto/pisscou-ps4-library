@@ -1,83 +1,114 @@
-name: Build PS4 Graphics PKG
+name: Build PISSCOU APP LIBRARY
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld make curl
+          sudo apt-get install -y clang lld make curl binutils
 
       - name: Download OpenOrbis v0.5.4
         run: |
           curl -fL \
             https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz \
             -o toolchain.tar.gz
+
           tar -xzf toolchain.tar.gz
 
-      - name: Find OpenOrbis Toolchain
+      - name: Find OpenOrbis
         run: |
-          TOOL=$(find "$GITHUB_WORKSPACE" -type f -name PkgTool.Core | head -n 1)
+          TOOL=$(find "$GITHUB_WORKSPACE" \
+            -type f \
+            -name PkgTool.Core \
+            | head -n 1)
 
           if [ -z "$TOOL" ]; then
-            echo "ERROR: PkgTool.Core not found"
+            echo "ERROR: OpenOrbis PkgTool.Core not found"
             exit 1
           fi
 
           TOOLCHAIN=$(dirname "$(dirname "$(dirname "$TOOL")")")
+
           echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
+
           chmod +x "$TOOLCHAIN"/bin/linux/* || true
 
-      - name: Find Graphics Sample
+          echo "Toolchain:"
+          echo "$TOOLCHAIN"
+
+      - name: Check Library Source
         run: |
-          SAMPLE=""
+          echo "===== LIBRARY SOURCE ====="
+          find samples/library -maxdepth 3 -type f | sort
 
-          for DIR in \
-            "$OO_PS4_TOOLCHAIN"/samples/* \
-            "$OO_PS4_TOOLCHAIN"/samples/*/*; do
+          echo
+          echo "===== MAIN.CPP ====="
+          cat samples/library/main.cpp
 
-            if [ -f "$DIR/Makefile" ]; then
-              if grep -qiE "piglet|opengl|egl|gles" "$DIR/Makefile"; then
-                SAMPLE="$DIR"
-                break
-              fi
-            fi
-          done
-
-          if [ -z "$SAMPLE" ]; then
-            echo "ERROR: Graphics sample not found."
-            exit 1
-          fi
-
-          echo "GRAPHICS_SAMPLE=$SAMPLE" >> "$GITHUB_ENV"
-
-      - name: Build Graphics Sample
-        working-directory: ${{ env.GRAPHICS_SAMPLE }}
+      - name: Build Library
+        working-directory: samples/library
         run: |
           make clean || true
           make
 
-      - name: Find PKG
+      - name: Verify Library Build
+        working-directory: samples/library
         run: |
-          PKG=$(find "$GRAPHICS_SAMPLE" -type f -name "*.pkg" | head -n 1)
+          echo "===== BUILD OUTPUT ====="
+          find . -type f | sort
 
-          if [ -z "$PKG" ]; then
-            echo "ERROR: No PKG was produced."
+          if [ ! -f eboot.bin ]; then
+            echo "ERROR: eboot.bin was not created"
             exit 1
           fi
 
+          echo
+          echo "===== EBOOT STRINGS ====="
+
+          strings eboot.bin | grep -Ei \
+            "PISSCOU|APP LIBRARY|FPKGi|GAME STORE|My Game" \
+            || true
+
+      - name: Find PKG
+        run: |
+          echo "===== PKG FILES ====="
+
+          find samples/library \
+            -type f \
+            -name "*.pkg" \
+            -print
+
+          PKG=$(find samples/library \
+            -type f \
+            -name "*.pkg" \
+            | head -n 1)
+
+          if [ -z "$PKG" ]; then
+            echo "ERROR: NO PKG WAS CREATED"
+            exit 1
+          fi
+
+          echo "================================="
+          echo "FINAL PKG:"
+          echo "$PKG"
+          echo "================================="
+
           echo "PKG=$PKG" >> "$GITHUB_ENV"
 
-      - name: Upload Graphics PKG
+      - name: Upload PISSCOU APP LIBRARY
         uses: actions/upload-artifact@v4
         with:
-          name: pisscou-graphics-test
+          name: PISSCOU-APP-LIBRARY
           path: ${{ env.PKG }}
